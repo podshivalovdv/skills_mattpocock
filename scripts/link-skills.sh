@@ -5,15 +5,56 @@ set -euo pipefail
 # It is not a supported installer. Modifications to it, or requests for
 # modifications, will not be approved.
 #
-# Links all skills in the repository into the local skill directories used by
-# each agent harness:
+# Links all skills in the repository into skills directories used by agent
+# harnesses. By default these are:
 #   - ~/.claude/skills: Claude Code
 #   - ~/.agents/skills: Codex and other Agent Skills-compatible harnesses
+# Pass --dest (repeatable) to link into specific directories instead, e.g.
+# ~/.copilot/skills for Copilot.
 # Each entry is a symlink into this repo, so a `git pull` is all that's needed
 # to keep installed skills up to date.
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-DESTS=("$HOME/.claude/skills" "$HOME/.agents/skills")
+
+usage() {
+  cat <<EOF
+Usage: ${0##*/} [--dest DIR]... [-h|--help]
+
+Creates one symlink per skill: DIR/<skill-name> --> $REPO/skills/.../<skill-name>.
+
+Options:
+  --dest DIR   Skills directory to link into. Repeat to link into several.
+               Default: ~/.claude/skills and ~/.agents/skills.
+               For Copilot use: ~/.copilot/skills.
+  -h, --help   Show this help.
+
+Examples:
+  ${0##*/}
+  ${0##*/} --dest ~/.copilot/skills
+EOF
+  exit 1
+}
+
+require_value() {
+  local flag="$1" value="${2-}"
+  if [ -z "$value" ] || [[ "$value" == --* ]]; then
+    echo "error: $flag requires a value" >&2
+    usage
+  fi
+}
+
+DESTS=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --dest)    require_value "$1" "${2-}"; DESTS+=("$2"); shift 2 ;;
+    -h|--help) usage ;;
+    *) echo "error: unknown option: $1" >&2; usage ;;
+  esac
+done
+
+if [ ${#DESTS[@]} -eq 0 ]; then
+  DESTS=("$HOME/.claude/skills" "$HOME/.agents/skills")
+fi
 
 # Collect the repo's skills once, link into every destination. `deprecated/`
 # is retired, and `misc/` is kept around but rarely used and not promoted (see
